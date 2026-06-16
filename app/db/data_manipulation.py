@@ -4,6 +4,7 @@ from app.db.stations import Stations
 from app.db.train_routes import TrainRoute
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from fastapi import HTTPException
 
 async def create_trains (session : AsyncSession) :
     
@@ -81,12 +82,12 @@ async def create_stations (session : AsyncSession) :
         await session.commit()
         return existing_station + new_station
     
-    return existing_name
+    return existing_station
 
 async def create_train_routes (session : AsyncSession , train_id , stations : list) :
     
     st = {
-        s.name : s for s in stations
+        s.name : s for s in stations 
     }
     
     stmt = select(TrainRoute).where(TrainRoute.train_id == train_id)
@@ -107,3 +108,11 @@ async def create_train_routes (session : AsyncSession , train_id , stations : li
     
     session.add_all(route)
     await session.commit()
+    
+async def get_all_trains (session : AsyncSession) :
+    result = await  session.execute(select(Trains))
+    return result.scalars().all()
+
+
+async def get_train_route (session : AsyncSession , train_id : int) :
+    pass
