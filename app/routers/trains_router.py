@@ -18,4 +18,4 @@ async def get_trains (session :  Annotated[AsyncSession , Depends(create_session
 async def train_route (train_id : int ,
                        session : Annotated[AsyncSession , Depends(create_session)]
                        ) :
-    return get_train_route(session , train_id)
+    return await get_train_route(session , train_id)
