@@ -2,9 +2,10 @@ from app.db.trains import Trains
 from app.db.seats import Seats
 from app.db.stations import Stations
 from app.db.train_routes import TrainRoute
+from app.db.tickets import Tickets
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from fastapi import HTTPException
+from fastapi import HTTPException , status
 
 async def create_trains (session : AsyncSession) :
     
@@ -115,4 +116,99 @@ async def get_all_trains (session : AsyncSession) :
 
 
 async def get_train_route (session : AsyncSession , train_id : int) :
-    pass
+    
+    train = await session.get(Trains , train_id)
+    
+    if not train :
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND ,
+                            detail="Поезд не найден"
+                            )
+    result = await session.execute(
+        select(TrainRoute , Stations)
+        .join(Stations , TrainRoute.stations_id == Stations.id)
+        .where(TrainRoute.train_id == train_id)
+        .order_by(TrainRoute.order)
+    )
+    
+    rows = result.all()
+    
+    return [
+        {
+            "order" : route.order ,  "station_id" : station.id , "station_name" : station.name
+        }
+        for route , station in rows
+    ]
+    
+async def get_available_seats (session : AsyncSession ,  train_id , from_station_id, to_station_id) :
+    
+    from_route = await session.execute(
+        select(TrainRoute)
+        .where(TrainRoute.train_id == train_id)
+        .where(TrainRoute.stations_id == from_station_id)
+    )
+    from_route = from_route.scalar_one_or_none()
+    
+    to_route = await session.execute(
+        select(TrainRoute)
+        .where(TrainRoute.train_id == train_id)
+        .where(TrainRoute.stations_id == to_station_id)
+    )
+    to_route = to_route.scalar_one_or_none()
+    
+    if not from_route or not to_route :
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail= "Станция не найдена в марщруте"
+                            )
+    
+    from_order = from_route.order
+    to_order = to_route.order
+    
+    if from_order >= to_order :
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, 
+                            detail= "Станция прибытия должна быть дальше по маршруту, чем станция отправления"
+                            )
+    
+    seats_result = await session.execute(
+        select(Seats).where(Seats.train_id == train_id)
+    )
+    all_seats = seats_result.scalars().all()
+    
+    
+    seat_ids = [seat.id for seat in all_seats]
+    
+    
+    tickets_result = await session.execute(
+        select(Tickets).where(Tickets.seat_id.in_(seat_ids))
+    )
+    
+    all_tickets = tickets_result.scalars().all()
+     
+    route_result = await session.execute(
+        select(TrainRoute).where(TrainRoute.train_id == train_id)
+    )
+    
+    order_by_station = {
+        r.stations_id : r.order
+        for r in route_result.scalars().all()
+    }
+    
+    available  = []
+    
+    for seat in all_seats:
+        busy = False
+        
+        for ticket in all_tickets :
+            if ticket.seat_id != seat.id :
+                continue
+            
+            ticket_from_order = order_by_station[ticket.from_station_id]
+            ticket_to_order = order_by_station[ticket.to_station_id]
+            
+            if ticket_from_order < to_order and ticket_to_order > from_order:
+                busy = True
+                break
+            
+        if not busy :
+            available.append(seat)
+            
+    return available
