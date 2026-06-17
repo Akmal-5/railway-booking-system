@@ -1,4 +1,5 @@
 from typing import Annotated
+from app.db.data_manipulation import buy_ticket
 from app.models.models import TicketCreate
 from app.Depends.create_session import create_session
 from fastapi import APIRouter , Depends
@@ -14,4 +15,4 @@ async def buy_ticket_route(
     ticket_data : TicketCreate,
     session : Annotated[AsyncSession , Depends(create_session)]) :
     
-    pass
+    return await buy_ticket(session ,  train_id , ticket_data)
