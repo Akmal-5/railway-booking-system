@@ -163,11 +163,6 @@ async def get_available_seats (session : AsyncSession ,  train_id , from_station
     from_order = from_route.order
     to_order = to_route.order
     
-    if from_order >= to_order :
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, 
-                            detail= "Станция прибытия должна быть дальше по маршруту, чем станция отправления"
-                            )
-    
     seats_result = await session.execute(
         select(Seats).where(Seats.train_id == train_id)
     )
@@ -192,6 +187,9 @@ async def get_available_seats (session : AsyncSession ,  train_id , from_station
         for r in route_result.scalars().all()
     }
     
+    low_order = min(from_order ,  to_order)
+    high_order = max(from_order , to_order)
+    
     available  = []
     
     for seat in all_seats:
@@ -204,7 +202,10 @@ async def get_available_seats (session : AsyncSession ,  train_id , from_station
             ticket_from_order = order_by_station[ticket.from_station_id]
             ticket_to_order = order_by_station[ticket.to_station_id]
             
-            if ticket_from_order < to_order and ticket_to_order > from_order:
+            ticket_low = min(ticket_from_order, ticket_to_order)
+            ticket_high = max(ticket_from_order, ticket_to_order)
+            
+            if ticket_low < high_order and ticket_high > low_order:
                 busy = True
                 break
             
@@ -212,3 +213,31 @@ async def get_available_seats (session : AsyncSession ,  train_id , from_station
             available.append(seat)
             
     return available
+
+
+async def buy_ticket (session : AsyncSession ,  train_id , ticket_data) :
+    
+    available_seats  = await get_available_seats (
+        session ,
+        train_id ,
+        ticket_data.from_station_id,
+        ticket_data.to_station_id,
+    )
+    
+    available_seat_ids = [seat.id for seat in available_seats]
+    
+    if ticket_data.seat_id not in available_seat_ids :
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST ,
+                            detail="Это место уже занято"
+                            )
+        
+    new_ticket = Tickets(
+        seat_id = ticket_data.seat_id,
+        from_station_id = ticket_data.from_station_id,
+        to_station_id = ticket_data.to_station_id,
+        passenger_name = ticket_data.passenger_name
+    )
+    
+    session.add(new_ticket)
+    await session.commit()
+    return new_ticket
