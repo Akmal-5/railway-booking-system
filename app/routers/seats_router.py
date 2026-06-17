@@ -6,7 +6,7 @@ from fastapi import APIRouter , Depends
 
 router = APIRouter(prefix = "/trains" , tags=["Места"])
 
-@router.get("{train_id}/seats")
+@router.get("/{train_id}/seats")
 
 async def available_seats(
     train_id :  int,

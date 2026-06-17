@@ -12,7 +12,7 @@ router = APIRouter(prefix="/trains" , tags=['Trains'])
 async def get_trains (session :  Annotated[AsyncSession , Depends(create_session)]) :
     return  await get_all_trains(session)
  
-@router.get("{train_id}/route" ,
+@router.get("/{train_id}/route" ,
             summary="Маршрут поезда"
             )
 async def train_route (train_id : int ,
