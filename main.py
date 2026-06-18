@@ -5,9 +5,18 @@ from app.routers.trains_router import router as train_get_router
 from app.routers.seats_router import router as seats_get_router
 from app.routers.tickets_routers import router as tickets_get_router
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.on_event("startup")
 async def startup () :
